@@ -42,9 +42,14 @@
 <body class="bg-slate-50 min-h-screen text-slate-800 font-sans flex items-center justify-center">
 
     <div class="w-full max-w-[98%] mx-auto px-2 py-4">
-        <header class="text-center mb-6">
+        <header class="text-center mb-6 relative">
             <h1 class="text-3xl font-extrabold text-slate-900 mb-1 tracking-tight">RemoveBG <span class="text-blue-600">Pro</span></h1>
             <p class="text-slate-500 text-sm font-medium uppercase tracking-tighter">Motor Dual: Recorte de Fotos y Transparencia de Textos</p>
+            
+            <!-- Botón de configuración para GitHub -->
+            <button onclick="openConfig()" class="absolute top-0 right-4 text-[10px] bg-slate-200 hover:bg-slate-300 px-2 py-1 rounded text-slate-600 transition-colors">
+                ⚙️ Configurar API
+            </button>
         </header>
 
         <main class="bg-white rounded-2xl shadow-2xl overflow-hidden border border-gray-100 mx-auto">
@@ -115,19 +120,60 @@
         </main>
     </div>
 
+    <!-- Modal de Configuración API -->
+    <div id="config-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl">
+            <h3 class="text-2xl font-bold text-slate-900 mb-4 text-center">Configurar API</h3>
+            <p class="text-slate-500 text-sm mb-6 text-center">Para que funcione en GitHub, pega tu <b>Google AI API Key</b>. Se guardará solo en tu navegador.</p>
+            <input type="password" id="api-input" placeholder="AIzaSy..." class="w-full p-3 border-2 border-slate-100 rounded-xl mb-4 focus:border-blue-500 outline-none text-sm transition-all font-mono">
+            <div class="flex gap-2">
+                <button onclick="saveConfig()" class="bg-blue-600 text-white flex-1 py-3 rounded-xl font-bold hover:bg-blue-700 transition-colors">Guardar Clave</button>
+                <button onclick="closeConfig()" class="bg-slate-100 text-slate-600 px-4 rounded-xl font-bold hover:bg-slate-200 transition-colors">Cancelar</button>
+            </div>
+            <p class="mt-4 text-[11px] text-slate-400 text-center italic">Consigue una gratis en <a href="https://aistudio.google.com/" target="_blank" class="text-blue-500 underline">Google AI Studio</a></p>
+        </div>
+    </div>
+
     <!-- Modal de Error -->
     <div id="error-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
         <div class="bg-white rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl">
             <div class="w-12 h-12 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 font-bold text-xl">!</div>
-            <h3 class="text-xl font-bold text-slate-900 mb-2">Error de Acceso</h3>
+            <h3 class="text-xl font-bold text-slate-900 mb-2">Error</h3>
             <p id="error-message" class="text-slate-500 text-sm mb-6"></p>
             <button onclick="document.getElementById('error-modal').style.display='none'" class="bg-slate-900 text-white w-full py-2.5 rounded-xl font-bold hover:bg-slate-800 transition-colors">Cerrar</button>
         </div>
     </div>
 
     <script>
-        // Nota: Para usar fuera de este entorno, debes generar tu propia API Key en AI Studio de Google.
-        const apiKey = ""; 
+        // Sistema de gestión de API Key para entornos externos (GitHub)
+        let currentApiKey = ""; 
+
+        // Al cargar, buscar si hay una clave guardada
+        window.onload = () => {
+            const savedKey = localStorage.getItem('removebg_api_key');
+            if (savedKey) {
+                currentApiKey = savedKey;
+            }
+        };
+
+        function openConfig() {
+            document.getElementById('api-input').value = currentApiKey;
+            document.getElementById('config-modal').style.display = 'flex';
+        }
+
+        function closeConfig() {
+            document.getElementById('config-modal').style.display = 'none';
+        }
+
+        function saveConfig() {
+            const val = document.getElementById('api-input').value.trim();
+            if (val) {
+                localStorage.setItem('removebg_api_key', val);
+                currentApiKey = val;
+                closeConfig();
+            }
+        }
+
         const dropZone = document.getElementById('drop-zone');
         const fileInput = document.getElementById('file-input');
         const editorSection = document.getElementById('editor-section');
@@ -208,9 +254,9 @@
         async function removeBackground() {
             if (!originalBase64) return;
             
-            // Verificación para GitHub
-            if (!apiKey) {
-                showError("Error 403: API Key no configurada. Esta aplicación requiere una clave de Google AI para funcionar fuera del entorno de desarrollo.");
+            // Si la clave de API está vacía, pedimos configurarla
+            if (!currentApiKey) {
+                openConfig();
                 return;
             }
 
@@ -223,7 +269,7 @@
 
             try {
                 const response = await fetchWithRetry(
-                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${apiKey}`,
+                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${currentApiKey}`,
                     {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -243,6 +289,7 @@
                 const result = await response.json();
 
                 if (result.error) {
+                    if (result.error.code === 403) throw new Error("API Key inválida o sin permisos.");
                     throw new Error(`Error ${result.error.code}: ${result.error.message}`);
                 }
 
@@ -253,10 +300,11 @@
                     resultPreview.classList.add('fade-in');
                     downloadBtn.disabled = false;
                 } else {
-                    throw new Error("La IA no pudo procesar esta imagen correctamente.");
+                    throw new Error("No se detectó un sujeto claro para procesar.");
                 }
             } catch (error) {
                 showError(error.message);
+                if (error.message.includes("403")) openConfig();
             } finally {
                 toggleEffects(false);
                 processBtn.disabled = false;
@@ -266,12 +314,10 @@
         async function fetchWithRetry(url, options, retries = 5, backoff = 1000) {
             try {
                 const response = await fetch(url, options);
-                // Si es 403, probablemente es la API Key
-                if (response.status === 403) throw new Error("Acceso prohibido (403). Verifica tu clave de API o los permisos de Google AI.");
-                if (!response.ok) throw new Error(`Error del servidor: ${response.status}`);
+                if (!response.ok) return response; // Devolver para manejar el JSON de error
                 return response;
             } catch (err) {
-                if (retries <= 0 || err.message.includes("403")) throw err;
+                if (retries <= 0) throw err;
                 await new Promise(resolve => setTimeout(resolve, backoff));
                 return fetchWithRetry(url, options, retries - 1, backoff * 2);
             }
@@ -282,5 +328,7 @@
             document.getElementById('error-modal').style.display = 'flex';
         }
     </script>
+</body>
+</html>
 </body>
 </html>
