@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RemoveBG Pro - Ultra Precisión</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes scan {
+            0% { top: 0%; }
+            50% { top: 100%; }
+            100% { top: 0%; }
+        }
+        .scanner-line {
+            position: absolute;
+            left: 0; width: 100%; height: 4px;
+            background: linear-gradient(to right, transparent, #3b82f6, #60a5fa, #3b82f6, transparent);
+            box-shadow: 0 0 20px #3b82f6; z-index: 20;
+            animation: scan 2s ease-in-out infinite;
+        }
+        .scan-overlay {
+            position: absolute; inset: 0;
+            background: linear-gradient(to bottom, transparent, rgba(59, 130, 246, 0.05), transparent);
+            z-index: 10;
+        }
+        .fade-in { animation: fadeIn 0.5s ease-out forwards; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.98); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        .checkerboard {
+            background-color: #e5e7eb;
+            background-image: 
+                linear-gradient(45deg, #f3f4f6 25%, transparent 25%), 
+                linear-gradient(-45deg, #f3f4f6 25%, transparent 25%), 
+                linear-gradient(45deg, transparent 75%, #f3f4f6 75%), 
+                linear-gradient(-45deg, transparent 75%, #f3f4f6 75%);
+            background-size: 20px 20px;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-800 font-sans flex items-center justify-center">
+
+    <div class="w-full max-w-[98%] mx-auto px-2 py-4">
+        <header class="text-center mb-6">
+            <h1 class="text-3xl font-extrabold text-slate-900 mb-1 tracking-tight">RemoveBG <span class="text-blue-600">Pro</span></h1>
+            <p class="text-slate-500 text-sm">Ultra precisión por IA con transparencia quirúrgica.</p>
+        </header>
+
+        <main class="bg-white rounded-2xl shadow-2xl overflow-hidden border border-gray-100 mx-auto">
+            <div id="upload-area" class="p-10">
+                <div id="drop-zone" class="border-3 border-dashed border-gray-200 rounded-2xl p-12 text-center hover:border-blue-500 hover:bg-blue-50/50 transition-all cursor-pointer group">
+                    <input type="file" id="file-input" class="hidden" accept="image/*">
+                    <div class="space-y-4">
+                        <div class="mx-auto h-16 w-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                            </svg>
+                        </div>
+                        <div>
+                            <div class="text-xl font-bold text-slate-700">Sube tu imagen aquí</div>
+                            <p class="text-slate-400 text-sm mt-1">PNG, JPG, WebP de alta calidad</p>
+                        </div>
+                        <button class="bg-slate-900 text-white px-6 py-2 rounded-xl font-semibold shadow-lg hover:bg-slate-800 transition-colors text-sm">Seleccionar Archivo</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="editor-section" class="hidden p-4 animate-fade-in">
+                <div class="flex flex-row gap-4 items-stretch justify-center">
+                    <div class="w-1/2 space-y-2 min-w-0">
+                        <div class="flex justify-between items-center px-1">
+                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Original</span>
+                            <span id="orig-res" class="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-500 font-mono italic">Calidad Original</span>
+                        </div>
+                        <div class="relative bg-slate-50 rounded-xl overflow-hidden border border-slate-100 flex items-center justify-center h-[65vh]">
+                            <div id="scan-line" class="scanner-line hidden"></div>
+                            <div id="scan-overlay" class="scan-overlay hidden"></div>
+                            <img id="original-preview" class="max-h-full max-w-full object-contain" src="" alt="Original">
+                        </div>
+                    </div>
+
+                    <div class="w-1/2 space-y-2 min-w-0">
+                        <div class="flex justify-between items-center px-1">
+                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-blue-600">Resultado Perfecto</span>
+                            <span class="text-[10px] bg-blue-100 px-1.5 py-0.5 rounded text-blue-600 font-bold uppercase">PNG Transparente HD</span>
+                        </div>
+                        <div id="result-container" class="relative checkerboard rounded-xl overflow-hidden border border-slate-100 flex items-center justify-center h-[65vh]">
+                            <div id="loader" class="hidden absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/95 backdrop-blur-md">
+                                <div class="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-3"></div>
+                                <p class="text-slate-900 font-bold text-sm tracking-tight">Refinando bordes...</p>
+                            </div>
+                            <img id="result-preview" class="max-h-full max-w-full object-contain z-0" src="" alt="Resultado">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex justify-center items-center gap-3 mt-6 pt-4 border-t border-slate-100">
+                    <button id="process-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-bold transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2 text-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        Remover Fondo (HD)
+                    </button>
+                    <button id="download-btn" disabled class="bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-3 rounded-xl font-bold transition-all shadow-lg disabled:opacity-30 disabled:grayscale disabled:cursor-not-allowed active:scale-95 flex items-center justify-center gap-2 text-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        Descargar HD
+                    </button>
+                    <button id="reset-btn" class="bg-slate-100 hover:bg-slate-200 text-slate-600 px-6 py-3 rounded-xl font-bold transition-all text-sm">
+                        Subir otra
+                    </button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="error-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-3xl p-6 max-w-xs w-full text-center shadow-2xl">
+            <div class="w-12 h-12 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 font-bold text-xl">!</div>
+            <h3 class="text-xl font-bold text-slate-900 mb-2">Error</h3>
+            <p id="error-message" class="text-slate-500 text-sm mb-6"></p>
+            <button onclick="document.getElementById('error-modal').style.display='none'" class="bg-slate-900 text-white w-full py-2.5 rounded-xl font-bold hover:bg-slate-800 transition-colors">Cerrar</button>
+        </div>
+    </div>
+
+    <script>
+        const apiKey = ""; 
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const editorSection = document.getElementById('editor-section');
+        const uploadArea = document.getElementById('upload-area');
+        const originalPreview = document.getElementById('original-preview');
+        const resultPreview = document.getElementById('result-preview');
+        const processBtn = document.getElementById('process-btn');
+        const downloadBtn = document.getElementById('download-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const loader = document.getElementById('loader');
+        const scanLine = document.getElementById('scan-line');
+        const scanOverlay = document.getElementById('scan-overlay');
+        const resLabel = document.getElementById('orig-res');
+
+        let originalBase64 = null;
+        let originalMime = "image/png";
+
+        dropZone.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files && e.target.files[0]) handleFile(e.target.files[0]);
+        });
+        
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('border-blue-500', 'bg-blue-50/50'); });
+        dropZone.addEventListener('dragleave', () => { dropZone.classList.remove('border-blue-500', 'bg-blue-50/50'); });
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-blue-500', 'bg-blue-50/50');
+            if (e.dataTransfer.files && e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+        });
+
+        resetBtn.addEventListener('click', () => {
+            editorSection.classList.add('hidden');
+            uploadArea.classList.remove('hidden');
+            fileInput.value = "";
+            resultPreview.src = "";
+            downloadBtn.disabled = true;
+            toggleEffects(false);
+        });
+
+        processBtn.addEventListener('click', removeBackground);
+
+        downloadBtn.addEventListener('click', () => {
+            const link = document.createElement('a');
+            link.href = resultPreview.src;
+            link.download = `PerfectBG_HD_${Date.now()}.png`;
+            link.click();
+        });
+
+        function handleFile(file) {
+            originalMime = file.type;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                originalBase64 = e.target.result.split(',')[1];
+                originalPreview.src = e.target.result;
+                const img = new Image();
+                img.onload = () => { resLabel.innerText = `${img.naturalWidth} x ${img.naturalHeight} px`; };
+                img.src = e.target.result;
+                uploadArea.classList.add('hidden');
+                editorSection.classList.remove('hidden');
+                resultPreview.src = "";
+                downloadBtn.disabled = true;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function toggleEffects(show) {
+            if (show) {
+                scanLine.classList.remove('hidden');
+                scanOverlay.classList.remove('hidden');
+                loader.classList.remove('hidden');
+            } else {
+                scanLine.classList.add('hidden');
+                scanOverlay.classList.add('hidden');
+                loader.classList.add('hidden');
+            }
+        }
+
+        async function removeBackground() {
+            if (!originalBase64) return;
+            toggleEffects(true);
+            processBtn.disabled = true;
+            resultPreview.classList.remove('fade-in');
+
+            // Refinamiento extremo de las instrucciones para la IA
+            const systemPrompt = "ULTRA-PRECISION TASK: Detect all foreground subjects with surgical accuracy. Remove ALL background pixels completely, ensuring 100% transparency (Alpha = 0). Pay special attention to hair, fine edges, and complex gaps. Return ONLY the high-quality isolated image as a PNG/IMAGE modality. DO NOT add shadows or borders. The edges must be pixel-perfect and clean.";
+            const userPrompt = "Process this image: Perfect background removal, high fidelity, 100% transparent PNG output.";
+
+            try {
+                const response = await fetchWithRetry(
+                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${apiKey}`,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{
+                                parts: [
+                                    { text: userPrompt },
+                                    { inlineData: { mimeType: originalMime, data: originalBase64 } }
+                                ]
+                            }],
+                            systemInstruction: {
+                                parts: [{ text: systemPrompt }]
+                            },
+                            generationConfig: {
+                                responseModalities: ['IMAGE'],
+                                temperature: 0 // Menor aleatoriedad para mayor precisión técnica
+                            }
+                        })
+                    }
+                );
+
+                const result = await response.json();
+                const imagePart = result.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
+
+                if (imagePart && imagePart.inlineData.data) {
+                    resultPreview.src = `data:image/png;base64,${imagePart.inlineData.data}`;
+                    resultPreview.classList.add('fade-in');
+                    downloadBtn.disabled = false;
+                } else {
+                    throw new Error("No se pudo lograr el recorte perfecto. Intenta con otra imagen.");
+                }
+            } catch (error) {
+                showError(error.message || "Error de comunicación.");
+            } finally {
+                toggleEffects(false);
+                processBtn.disabled = false;
+            }
+        }
+
+        async function fetchWithRetry(url, options, retries = 5, backoff = 1000) {
+            try {
+                const response = await fetch(url, options);
+                if (!response.ok) throw new Error(`Status ${response.status}`);
+                return response;
+            } catch (err) {
+                if (retries <= 0) throw err;
+                await new Promise(resolve => setTimeout(resolve, backoff));
+                return fetchWithRetry(url, options, retries - 1, backoff * 2);
+            }
+        }
+
+        function showError(msg) {
+            document.getElementById('error-message').innerText = msg;
+            document.getElementById('error-modal').style.display = 'flex';
+        }
+    </script>
+</body>
+</html>
